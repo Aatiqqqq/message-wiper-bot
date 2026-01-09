@@ -9,13 +9,13 @@ const {
 } = require("discord.js");
 
 // ===================== CONFIG =====================
-// 🔑 Bot token (use Railway / .env)
 const TOKEN = process.env.TOKEN;
 
-// 🧹 CHANNEL WHERE COMMAND IS ALLOWED
-// 👉 PUT YOUR message-cleaner CHANNEL ID HERE
-const CLEANER_CHANNEL_ID = "1459227178653847700";
+// 🔴 PUT YOUR SERVER (GUILD) ID HERE
+const GUILD_ID = "1433087368335724616";
 
+// 🧹 message-cleaner CHANNEL ID (YOU GAVE THIS)
+const CLEANER_CHANNEL_ID = "1459227178653847700";
 // =================================================
 
 const client = new Client({
@@ -28,15 +28,18 @@ const client = new Client({
 // ===================== READY =====================
 client.once("ready", async () => {
   console.log(`🧹 Message Cleaner active as ${client.user.tag}`);
-console.log("Registering slash commands...");
 
-  // Register slash command (once per restart)
-  await client.application.commands.set([
+  const guild = await client.guilds.fetch(GUILD_ID);
+
+  console.log("Registering slash commands (guild only)...");
+  await guild.commands.set([
     {
       name: "cleaner",
       description: "Clean messages in a selected channel (Admin only)"
     }
   ]);
+
+  console.log("Slash command registered instantly ✅");
 });
 
 // ===================== INTERACTIONS =====================
@@ -51,7 +54,7 @@ client.on("interactionCreate", async interaction => {
       });
     }
 
-    // Admin-only
+    // Admin only
     if (
       !interaction.member.permissions.has(
         PermissionsBitField.Flags.Administrator
@@ -141,7 +144,7 @@ client.on("interactionCreate", async interaction => {
       components: []
     });
 
-    // Discord limit: deletes messages < 14 days old
+    // Discord rule: only messages < 14 days can be bulk deleted
     let deleted;
     do {
       deleted = await channel.bulkDelete(100, true);
