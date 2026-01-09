@@ -8,30 +8,24 @@ const {
   ChannelSelectMenuBuilder
 } = require("discord.js");
 
-// ===================== CONFIG =====================
 const TOKEN = process.env.TOKEN;
-
-// 🔴 PUT YOUR SERVER (GUILD) ID HERE
 const GUILD_ID = "1433087368335724616";
-
-// 🧹 message-cleaner CHANNEL ID (YOU GAVE THIS)
 const CLEANER_CHANNEL_ID = "1459227178653847700";
-// =================================================
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
   ]
 });
 
-// ===================== READY =====================
 client.once("ready", async () => {
   console.log(`🧹 Message Cleaner active as ${client.user.tag}`);
 
   const guild = await client.guilds.fetch(GUILD_ID);
 
-  console.log("Registering slash commands (guild only)...");
+  console.log("Registering slash commands...");
   await guild.commands.set([
     {
       name: "cleaner",
@@ -42,26 +36,23 @@ client.once("ready", async () => {
   console.log("Slash command registered instantly ✅");
 });
 
-// ===================== INTERACTIONS =====================
 client.on("interactionCreate", async interaction => {
-  // ---------- SLASH COMMAND ----------
+  // ---------- SLASH ----------
   if (interaction.isChatInputCommand() && interaction.commandName === "cleaner") {
-    // Channel restriction
     if (interaction.channelId !== CLEANER_CHANNEL_ID) {
       return interaction.reply({
-        content: "❌ Use this command only in the **message-cleaner** channel.",
+        content: "❌ Use this only in #message-cleaner",
         ephemeral: true
       });
     }
 
-    // Admin only
     if (
       !interaction.member.permissions.has(
         PermissionsBitField.Flags.Administrator
       )
     ) {
       return interaction.reply({
-        content: "❌ Only administrators can use this command.",
+        content: "❌ Admins only.",
         ephemeral: true
       });
     }
@@ -75,15 +66,19 @@ client.on("interactionCreate", async interaction => {
 
     return interaction.reply({
       content:
-        "⚠️ **WARNING**\n\n" +
-        "This will permanently delete messages from a channel.\n" +
-        "Click the red button to continue.",
+        "⚠️ **WARNING**\n\nThis will permanently delete messages.\nProceed carefully.",
       components: [row]
     });
   }
 
-  // ---------- START BUTTON ----------
+  // ---------- BUTTON: START ----------
   if (interaction.isButton() && interaction.customId === "cleaner_start") {
+    if (
+      !interaction.member.permissions.has(
+        PermissionsBitField.Flags.Administrator
+      )
+    ) return interaction.reply({ content: "Admins only.", ephemeral: true });
+
     const menu = new ActionRowBuilder().addComponents(
       new ChannelSelectMenuBuilder()
         .setCustomId("cleaner_select")
@@ -91,16 +86,19 @@ client.on("interactionCreate", async interaction => {
     );
 
     return interaction.update({
-      content: "🧹 Select the channel you want to **DELETE ALL MESSAGES FROM**:",
+      content: "🧹 Select the channel to wipe:",
       components: [menu]
     });
   }
 
   // ---------- CHANNEL SELECT ----------
-  if (
-    interaction.isChannelSelectMenu() &&
-    interaction.customId === "cleaner_select"
-  ) {
+  if (interaction.isChannelSelectMenu()) {
+    if (
+      !interaction.member.permissions.has(
+        PermissionsBitField.Flags.Administrator
+      )
+    ) return interaction.reply({ content: "Admins only.", ephemeral: true });
+
     const channelId = interaction.values[0];
 
     const confirmRow = new ActionRowBuilder().addComponents(
@@ -116,9 +114,7 @@ client.on("interactionCreate", async interaction => {
 
     return interaction.update({
       content:
-        `⚠️ **FINAL CONFIRMATION**\n\n` +
-        `Are you sure you want to delete **ALL messages** in <#${channelId}>?\n\n` +
-        `❌ This action CANNOT be undone.`,
+        `⚠️ FINAL CONFIRMATION\nDelete ALL messages in <#${channelId}>?`,
       components: [confirmRow]
     });
   }
@@ -131,28 +127,31 @@ client.on("interactionCreate", async interaction => {
     });
   }
 
-  // ---------- CONFIRM DELETE ----------
-  if (
-    interaction.isButton() &&
-    interaction.customId.startsWith("cleaner_confirm_")
-  ) {
+  // ---------- CONFIRM ----------
+  if (interaction.isButton() && interaction.customId.startsWith("cleaner_confirm_")) {
+    if (
+      !interaction.member.permissions.has(
+        PermissionsBitField.Flags.Administrator
+      )
+    ) return interaction.reply({ content: "Admins only.", ephemeral: true });
+
     const channelId = interaction.customId.replace("cleaner_confirm_", "");
     const channel = await interaction.guild.channels.fetch(channelId);
 
     await interaction.update({
-      content: `🧹 Deleting messages in ${channel}...`,
+      content: `🧹 Cleaning ${channel}...`,
       components: []
     });
 
-    // Discord rule: only messages < 14 days can be bulk deleted
-    let deleted;
-    do {
-      deleted = await channel.bulkDelete(100, true);
-    } while (deleted.size > 0);
+    let totalDeleted = 0;
+    while (true) {
+      const deleted = await channel.bulkDelete(100, true);
+      totalDeleted += deleted.size;
+      if (deleted.size < 2) break;
+    }
 
-    channel.send("✅ **All deletable messages have been wiped.**");
+    channel.send(`✅ Wiped **${totalDeleted}** messages.`);
   }
 });
 
-// ===================== LOGIN =====================
 client.login(TOKEN);
