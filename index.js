@@ -28,6 +28,7 @@ const client = new Client({
 // ===================== READY =====================
 client.once("ready", async () => {
   console.log(`🧹 Message Cleaner active as ${client.user.tag}`);
+console.log("Registering slash commands...");
 
   // Register slash command (once per restart)
   await client.application.commands.set([
